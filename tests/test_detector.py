@@ -18,6 +18,11 @@ def test_all_numeric_features_present():
     assert list(feats)==FEATURE_NAMES
     assert all(isinstance(value,(float,int)) for value in feats.values())
 
+def test_hindi_phishing_terms_trigger_hindi_feature():
+    feats=extract_single_numeric_features({"subject":"खाता तुरंत सत्यापित करें","body":"पासवर्ड दर्ज करें या खाता निलंबित होगा; चेतावनी"})
+    assert feats["hindi_urgent_words"] >= 5
+    assert feats["asks_password"] == 1
+
 def test_prediction_result_fields_for_both_examples():
     artifact=train_models(generate_sample_dataset(40,40),save=False)
     required={"id","timestamp","university","subject","sender","classification","risk_score_percent","probability_phishing","risk_level","threshold_used","reasons","recommendations","features","links","attachments","model_name"}
@@ -31,6 +36,9 @@ def test_prediction_result_fields_for_both_examples():
         assert any(reason != fallback for reason in phishing["reasons"])
     canonical=predict_record(CANONICAL_LEGITIMATE_SAMPLE,artifact)
     assert canonical["classification"] == "Legitimate"
+    minimal=predict_record({"subject":"Campus notice"},artifact,threshold=0.0)
+    assert minimal["classification"] == "Phishing"
+    assert any("Limited evidence" in reason and all(term in reason for term in ("sender domain", "links", "SPF/DKIM/DMARC")) for reason in minimal["reasons"])
 
 def test_normalization_handles_null_empty_and_nan_values():
     record = normalize_record({"subject": None, "body": np.nan, "html": "", "sender": None,
@@ -71,5 +79,11 @@ def test_predict_eml_integration_valid_empty_and_non_email_uploads():
         empty = client.post("/predict-eml", files={"file": ("empty.eml", b"", "message/rfc822")})
         assert empty.status_code == 400
         disguised = client.post("/predict-eml", files={"file": ("notes.eml", b"This is ordinary text, not an email message.", "text/plain")})
-        assert disguised.status_code == 200
-        assert isinstance(disguised.json()["classification"], str)
+        assert disguised.status_code == 400
+        assert "parsable email" in disguised.json()["detail"]
+
+def test_predict_eml_rejects_upload_over_size_limit():
+    payload=b"From: office@dhgsu.ac.in\r\nSubject: Large message\r\n\r\n" + b"x" * (10 * 1024 * 1024)
+    with TestClient(app) as client:
+        response=client.post("/predict-eml",files={"file":("large.eml",payload,"message/rfc822")})
+    assert response.status_code == 413

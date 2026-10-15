@@ -28,13 +28,24 @@ Python 3.10+: `python -m venv .venv`, activate it (`.venv\\Scripts\\activate` on
 
 Demo credentials: `admin / admin123`, `user / user123`. They are demonstration-only; production requires secure authentication and secret management.
 
-## Metrics and limitations
+## Evaluation protocol
 
-The generator creates paraphrases, varied greetings/signatures, harder legitimate security notices, and polite spoofed emails. Where generated template groups are available, whole groups are held out for testing. A separate validation portion of the training data selects the threshold; 0.5 is used as the documented tie/default fallback. Three-fold stratified cross-validation is run on the training partition. Each run logs its actual per-model accuracy, precision, recall, F1, ROC-AUC, PR-AUC, confusion matrix, error rates, threshold, and selected model's cross-validation F1. The values vary by run/configuration and are recorded in the console and saved artifact rather than presented here as fixed benchmark scores.
+The training workflow uses training, validation, and test partitions. When generated `template_group` metadata is available and each class has enough distinct groups, complete message families are assigned to one partition so paraphrases do not cross partitions. Custom data without enough groups uses stratified row splits. Candidate models and the phishing threshold are selected using validation F1. The selected model is refitted on combined training and validation data; the held-out test partition is used only once for its final accuracy, precision, recall, F1, ROC-AUC, PR-AUC, confusion counts, and false-positive/negative rates. Three-fold cross-validation F1 is also recorded on development data. The built-in dataset is synthetic, so these metrics do not establish real-world performance.
+
+Hindi keyword support uses UTF-8 source encoding and Unicode-safe Devanagari terms.
+
+If predictions seem inconsistent after detector code changes, delete `models/phishing_artifact.joblib` and run `python enhanced_phishing_detector.py` to retrain and save a fresh artifact. Review the printed metrics and demo predictions after retraining.
 
 ## Known limitations
 
-Metrics are computed on synthetic data and do not establish real-world detection performance. Generated message families remain a simplified proxy for real mail; template-group separation reduces direct text leakage but cannot model the full variety of university communications or adversarial adaptation. Heuristic rules can be wrong. Authentication is parsed only from headers, without DNS checks. The threat-intelligence helper is a local heuristic placeholder; possible future optional providers include VirusTotal, Google Safe Browsing, URLhaus, OpenPhish, and AbuseIPDB. SHAP is optional.
+- The built-in training dataset is synthetic; no real university dataset is included.
+- SPF/DKIM/DMARC are parsed from message headers, with no live DNS or cryptographic validation.
+- No real university mail server integration is implemented.
+- No real threat-intelligence API is enabled; its score is a local heuristic placeholder.
+- Demo authentication is hard-coded and is not production-safe.
+- False positives and false negatives remain possible; synthetic metrics do not prove real-world effectiveness.
+- Human review is required before blocking messages or taking production action.
+- Prediction and feedback records are stored locally under `logs/`; apply suitable access and retention controls.
 
 ## Security and privacy
 
