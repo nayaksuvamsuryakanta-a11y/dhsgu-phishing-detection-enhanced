@@ -1,0 +1,11 @@
+id,timestamp,university,subject,sender,classification,risk_score_percent,risk_level,model_name
+96d41595-492f-4154-9a99-ea6c430419d1,2026-10-15T11:31:58.106557+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),Notice,office@dhgsu.ac.in,Phishing,100,Critical Risk,Logistic Regression
+f9db198f-18a4-484a-8e02-b65ed7885bf5,2026-10-15T11:31:58.122847+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),Hello,,Phishing,100,Critical Risk,Logistic Regression
+d40ce1cf-c56a-4429-9ae6-0a629a333e44,2026-10-15T11:31:58.265649+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),Long,,Phishing,100,Critical Risk,Logistic Regression
+3e48d03b-98ff-4811-bdb4-3756748a4f70,2026-10-15T11:31:58.302347+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),Campus notice,office@dhgsu.ac.in,Phishing,100,Critical Risk,Logistic Regression
+ee7ff17f-76a9-470b-bb11-aa39f0472ce2,2026-10-15T11:31:58.317662+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),,,Phishing,100,Critical Risk,Logistic Regression
+f85a0f1d-7ded-402f-90c2-2c7bce58098b,2026-10-15T11:32:30.797785+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),Notice,office@dhgsu.ac.in,Phishing,100,Critical Risk,Logistic Regression
+892fc596-f565-4ccd-8366-29f29e2160d3,2026-10-15T11:32:30.815258+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),Hello,,Phishing,100,Critical Risk,Logistic Regression
+8a1b9d84-5c66-4aaa-ba94-28969fab6f87,2026-10-15T11:32:31.062662+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),Long,,Phishing,100,Critical Risk,Logistic Regression
+e7285938-1c61-4956-8fa8-b176e2ba5485,2026-10-15T11:32:31.091017+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),Campus notice,office@dhgsu.ac.in,Phishing,100,Critical Risk,Logistic Regression
+26853c9d-df3d-42c7-9a9a-c92d7ef98a3b,2026-10-15T11:32:31.104342+00:00,Dr. Harisingh Gour Vishwavidyalaya (Sagar University),,,Phishing,100,Critical Risk,Logistic Regression

@@ -1,7 +1,7 @@
 """Streamlit dashboard for the local HGU phishing detector."""
 import pandas as pd
 import streamlit as st
-from enhanced_phishing_detector import LOG_DIR, generate_report, load_artifact, log_prediction, normalize_record, parse_email_bytes, predict_record, record_feedback, scan_directory
+from enhanced_phishing_detector import LOG_DIR, MODEL_DIR, generate_report, load_artifact, log_prediction, normalize_record, parse_email_bytes, predict_record, record_feedback, scan_directory
 
 st.set_page_config(page_title="HGU Phishing Detection", page_icon="🛡️", layout="wide")
 st.title("🛡️ HGU University Phishing Detection")
@@ -17,13 +17,22 @@ if "role" not in st.session_state:
             st.error("Invalid demo credentials")
     st.stop()
 if st.sidebar.button("Log out"):
-    del st.session_state.role; st.rerun()
+    for key in ("role", "last_result", "scan_results"):
+        st.session_state.pop(key, None)
+    st.rerun()
 
 @st.cache_resource
 def get_artifact():
+    if not (MODEL_DIR / "phishing_artifact.joblib").is_file():
+        raise FileNotFoundError("models/phishing_artifact.joblib is missing")
     return load_artifact()
 
-artifact = get_artifact(); role = st.session_state.role
+try:
+    artifact = get_artifact()
+except Exception:
+    st.warning("The phishing model is unavailable or damaged. Contact the administrator to restore models/phishing_artifact.joblib.")
+    st.stop()
+role = st.session_state.role
 tab_names = ["Analyze Email"] + (["Scan EML Folder", "Prediction Logs", "Feedback Logs"] if role == "admin" else [])
 tabs = st.tabs(tab_names)
 with tabs[0]:
@@ -37,8 +46,17 @@ with tabs[0]:
         body=st.text_area("Body",height=180); html_body=st.text_area("HTML body",height=120)
         submitted=st.form_submit_button("Analyze email")
     if submitted:
-        rec=parse_email_bytes(uploaded.getvalue()) if uploaded else normalize_record({"subject":subject,"sender":sender,"reply_to":reply_to,"return_path":return_path,"spf_result":spf,"dkim_result":dkim,"dmarc_result":dmarc,"links":links,"attachments":attachments,"body":body,"html":html_body})
-        result=predict_record(rec,artifact); log_prediction(result); st.session_state.last_result=result
+        try:
+            if uploaded:
+                raw = uploaded.getvalue()
+                if not raw:
+                    raise ValueError("The uploaded email file is empty. Choose a non-empty .eml file.")
+                rec = parse_email_bytes(raw)
+            else:
+                rec=normalize_record({"subject":subject,"sender":sender,"reply_to":reply_to,"return_path":return_path,"spf_result":spf,"dkim_result":dkim,"dmarc_result":dmarc,"links":links,"attachments":attachments,"body":body,"html":html_body})
+            result=predict_record(rec,artifact); log_prediction(result); st.session_state.last_result=result
+        except Exception:
+            st.error("We could not analyze this email. Check that the .eml file is valid and try again.")
     result=st.session_state.get("last_result")
     if result:
         icon="🔴" if result["classification"]=="Phishing" else "🟢"

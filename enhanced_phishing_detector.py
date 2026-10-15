@@ -50,13 +50,29 @@ def _similarity(domain):
     return max((SequenceMatcher(None, domain.replace("-", ""), t.split(".")[0].replace("-", "")).ratio() for t in TRUSTED_DOMAINS), default=0.0)
 
 def analyze_html(html):
-    soup = BeautifulSoup(html or "", "html.parser")
+    # HTML is untrusted input. Coerce odd values and keep parser failures from
+    # taking down a whole prediction request.
+    try:
+        soup = BeautifulSoup(html if isinstance(html, str) else "", "html.parser")
+    except Exception:
+        soup = BeautifulSoup("", "html.parser")
     anchors = [{"href": a.get("href", ""), "text": a.get_text(" ", strip=True)} for a in soup.find_all("a")]
     hidden = any(i.get("type", "").lower() == "hidden" or "display:none" in str(i.get("style", "")).replace(" ", "").lower() for i in soup.find_all(["input", "div", "span"]))
     return {"anchors": anchors, "html_link_count": len(anchors), "html_button_count": len(soup.find_all("button")), "html_image_count": len(soup.find_all("img")), "has_hidden_input": int(hidden)}
 
 def normalize_record(record):
-    r = dict(record)
+    try:
+        r = dict(record) if record is not None else {}
+    except (TypeError, ValueError):
+        r = {}
+    def safe(value):
+        if value is None: return ""
+        try:
+            if pd.isna(value): return ""
+        except (TypeError, ValueError):
+            pass
+        return value
+    r = {k: safe(v) for k, v in r.items()}
     out = {k: r.get(k, "") for k in ("subject", "body", "html", "sender", "reply_to", "return_path", "spf_result", "dkim_result", "dmarc_result", "text")}
     for key in ("links", "anchors", "attachments"):
         v = r.get(key, [])
@@ -72,6 +88,8 @@ def normalize_record(record):
     return out
 
 def parse_email_bytes(raw_bytes):
+    if not isinstance(raw_bytes, (bytes, bytearray)) or not raw_bytes:
+        raise ValueError("The uploaded email is empty or invalid.")
     msg = BytesParser(policy=policy.default).parsebytes(raw_bytes); plain, html_parts, attachments = [], [], []
     for part in msg.walk():
         if part.is_multipart(): continue

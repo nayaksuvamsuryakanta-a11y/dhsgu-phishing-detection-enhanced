@@ -7,6 +7,7 @@ beautifulsoup4
 lxml
 streamlit
 fastapi
+httpx
 uvicorn
 python-multipart
 shap

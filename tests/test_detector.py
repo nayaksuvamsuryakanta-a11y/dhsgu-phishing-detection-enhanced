@@ -1,4 +1,7 @@
 import pandas as pd
+import numpy as np
+from fastapi.testclient import TestClient
+from api import app
 from enhanced_phishing_detector import CANONICAL_LEGITIMATE_SAMPLE, FEATURE_NAMES, extract_single_numeric_features, generate_sample_dataset, normalize_record, predict_record, train_models
 
 def test_dataset_nonempty_and_balanced_labels():
@@ -28,3 +31,45 @@ def test_prediction_result_fields_for_both_examples():
         assert any(reason != fallback for reason in phishing["reasons"])
     canonical=predict_record(CANONICAL_LEGITIMATE_SAMPLE,artifact)
     assert canonical["classification"] == "Legitimate"
+
+def test_normalization_handles_null_empty_and_nan_values():
+    record = normalize_record({"subject": None, "body": np.nan, "html": "", "sender": None,
+                               "links": None, "attachments": np.nan})
+    assert record["subject"] == record["body"] == record["sender"] == ""
+    assert record["links"] == record["attachments"] == []
+    features = extract_single_numeric_features(None)
+    assert list(features) == FEATURE_NAMES
+    assert all(np.isfinite(value) for value in features.values())
+
+def test_malformed_nested_html_and_unusual_urls_are_safe():
+    html = "<div>" * 500 + '<a href="http://127.0.0.1/路径">例え.テスト</a>' + "</span>" * 500
+    record = normalize_record({"html": html, "links": ["example.com/path", "http://127.0.0.1/a", "https://例え.テスト/道"]})
+    assert record["html_link_count"] == 1
+    features = extract_single_numeric_features(record)
+    assert features["ip_url"] == 2
+    assert features["num_links"] >= 3
+    assert all(np.isfinite(value) for value in features.values())
+
+def test_predict_json_integration_valid_missing_optional_and_long_input():
+    with TestClient(app) as client:
+        complete = client.post("/predict-json", json={"subject":"Notice", "body":"Campus update", "sender":"office@dhgsu.ac.in", "html":"<p>Update</p>", "attachments":[], "links":[]})
+        assert complete.status_code == 200
+        assert complete.json()["classification"] in {"Legitimate", "Phishing"}
+        minimal = client.post("/predict-json", json={"subject":"Hello", "body":"No optional fields"})
+        assert minimal.status_code == 200
+        assert minimal.json()["features"]["num_attachments"] == 0
+        long_text = client.post("/predict-json", json={"subject":"Long", "body":"x" * 100_000})
+        assert long_text.status_code == 200
+        assert 0 <= long_text.json()["risk_score_percent"] <= 100
+
+def test_predict_eml_integration_valid_empty_and_non_email_uploads():
+    valid = b"From: office@dhgsu.ac.in\r\nTo: student@example.com\r\nSubject: Campus notice\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nPlease review the campus update."
+    with TestClient(app) as client:
+        response = client.post("/predict-eml", files={"file": ("notice.eml", valid, "message/rfc822")})
+        assert response.status_code == 200
+        assert response.json()["subject"] == "Campus notice"
+        empty = client.post("/predict-eml", files={"file": ("empty.eml", b"", "message/rfc822")})
+        assert empty.status_code == 400
+        disguised = client.post("/predict-eml", files={"file": ("notes.eml", b"This is ordinary text, not an email message.", "text/plain")})
+        assert disguised.status_code == 200
+        assert isinstance(disguised.json()["classification"], str)
